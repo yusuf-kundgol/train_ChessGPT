@@ -20,7 +20,7 @@ num_proc_load_dataset = num_proc
 
 if __name__ == "__main__":
     # Load your local CSV file
-    dataset = load_dataset("csv", data_files={"train": "data/chess_1000_no_x/chess_1000_no_x.csv"})
+    dataset = load_dataset("csv", data_files={"train": "data/chess_1000_no_+/chess_1000_no_+.csv"})
     
     # Original code for loading from HuggingFace:
     # dataset_path = "adamkarvonen/chess_games"
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     column_name = "transcript"
 
     def process(example):
-        ids = np.array([stoi[c] for c in example[column_name]], dtype=dtype)
+        ids = np.array([stoi[c] for c in example["transcript"]], dtype=dtype)
         out = {"ids": ids, "len": len(ids)}
         return out
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         process,
         remove_columns=[column_name],
         desc="tokenizing the splits",
-        num_proc=num_proc,
+        num_proc=1,  # Use 1 process to avoid pickling issues
     )
 
     # print(tokenized["val"]["ids"])
@@ -91,7 +91,9 @@ if __name__ == "__main__":
         filename = os.path.join(os.path.dirname(__file__), f"{split}.bin")
         arr = np.memmap(filename, dtype=dtype, mode="w+", shape=(arr_len,))
         print(arr.shape)
-        total_batches = 1024
+        
+        # Determine total batches based on dataset size
+        total_batches = min(1024, len(dset))
 
         idx = 0
         for batch_idx in tqdm(range(total_batches), desc=f"writing {filename}"):
