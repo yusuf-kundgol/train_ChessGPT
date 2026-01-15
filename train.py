@@ -119,7 +119,7 @@ def get_batch(split):
     data = train_data if split == 'train' else val_data
     # ix = torch.randint(len(data) - block_size, (batch_size,))
     # Ensure the starting index is a multiple of block_size
-    ix = torch.randint(0, len(data) // (block_size + 1), (batch_size,)) * (block_size + 1)
+    ix = torch.randint(0, len(data) // block_size, (batch_size,)) * block_size
     x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
     y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
     if device_type == 'cuda':
@@ -157,13 +157,18 @@ if init_from == 'scratch':
 elif init_from == 'resume':
     print(f"Resuming training from {out_dir}")
     # resume training from a checkpoint.
-    ckpt_path = os.path.join(out_dir, 'ckpt.pt')
+    # Check for both weights.pt and ckpt.pt
+    ckpt_path = os.path.join(out_dir, 'weights.pt')
+    if not os.path.exists(ckpt_path):
+        ckpt_path = os.path.join(out_dir, 'ckpt.pt')
     checkpoint = torch.load(ckpt_path, map_location=device)
     checkpoint_model_args = checkpoint['model_args']
     # force these config attributes to be equal otherwise we can't even resume training
     # the rest of the attributes (e.g. dropout) can stay as desired from command line
     for k in ['n_layer', 'n_head', 'n_embd', 'block_size', 'bias', 'vocab_size']:
         model_args[k] = checkpoint_model_args[k]
+    # Update the global block_size variable to match the checkpoint
+    block_size = model_args['block_size']
     # create the model
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
@@ -197,7 +202,10 @@ scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
 # optimizer
 optimizer = model.configure_optimizers(weight_decay, learning_rate, (beta1, beta2), device_type)
 if init_from == 'resume':
-    optimizer.load_state_dict(checkpoint['optimizer'])
+    if 'optimizer' in checkpoint:
+        optimizer.load_state_dict(checkpoint['optimizer'])
+    else:
+        print("Warning: optimizer state not found in checkpoint, starting with fresh optimizer")
 checkpoint = None # free up memory
 
 # compile the model

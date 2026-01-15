@@ -71,6 +71,8 @@ if __name__ == "__main__":
 
     def process(example):
         ids = np.array([stoi[c] for c in example["transcript"]], dtype=dtype)
+        # Truncate to 1023 tokens to match model's block_size
+        ids = ids[:1023]
         out = {"ids": ids, "len": len(ids)}
         return out
 
@@ -82,7 +84,7 @@ if __name__ == "__main__":
         num_proc=1,  # Use 1 process to avoid pickling issues
     )
 
-    # print(tokenized["val"]["ids"])
+    print(tokenized["val"]["ids"])
 
     # concatenate all the ids in each dataset into one large file we can use for training
     for split, dset in tokenized.items():
